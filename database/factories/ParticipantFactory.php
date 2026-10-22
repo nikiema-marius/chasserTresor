@@ -16,8 +16,7 @@ class ParticipantFactory extends Factory
     {
         return [
             'campaign_id' => Campaign::factory(),
-            'first_name' => fake()->firstName(),
-            'last_name' => fake()->lastName(),
+            'pseudo' => fake()->userName(),
             // Numéro burkinabè fictif : +226 7X XX XX XX
             'phone_e164' => '+2267'.fake()->unique()->numerify('#######'),
             'consent_rules_at' => now(),

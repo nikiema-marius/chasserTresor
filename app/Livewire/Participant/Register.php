@@ -4,12 +4,12 @@ namespace App\Livewire\Participant;
 
 use App\Enums\OtpPurpose;
 use App\Enums\ParticipantStatus;
-use App\Enums\ScanResult;
 use App\Exceptions\OtpThrottledException;
 use App\Livewire\Concerns\AuthenticatesParticipant;
 use App\Livewire\Concerns\ThrottlesActions;
 use App\Models\Campaign;
 use App\Models\Participant;
+use App\Models\QrCode;
 use App\Rules\NotWeakPin;
 use App\Services\AuditLogger;
 use App\Services\OtpService;
@@ -17,14 +17,15 @@ use App\Support\Phone;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 /**
- * Inscription : formulaire → (OTP SMS si activé) → création du compte.
- * Sans OTP, le participant choisit un PIN qui lui servira à se reconnecter.
+ * Inscription : pseudo + téléphone + code secret (4 chiffres) → création du compte.
+ * Avec OTP activé (GAME_OTP_ENABLED), le téléphone est vérifié par SMS à la place du code secret.
  */
 #[Layout('components.layouts.app')]
 #[Title('Inscription')]
@@ -32,9 +33,7 @@ class Register extends Component
 {
     use AuthenticatesParticipant, ThrottlesActions;
 
-    public string $first_name = '';
-
-    public string $last_name = '';
+    public string $pseudo = '';
 
     public string $phone = '';
 
@@ -42,11 +41,7 @@ class Register extends Component
 
     public bool $consent_marketing = false;
 
-    public bool $age_confirmed = false;
-
     public string $pin = '';
-
-    public string $pin_confirmation = '';
 
     public string $code = '';
 
@@ -57,35 +52,49 @@ class Register extends Component
     #[Locked]
     public ?string $pendingPhone = null;
 
+    // Jeu imposé (QR scanné, lien ?jeu=…, ou seul jeu en ligne) ; sinon le participant choisit
     #[Locked]
     public ?int $campaignId = null;
+
+    public ?int $chosenCampaignId = null;
 
     #[Locked]
     public bool $otpRequired = true;
 
     public function mount(): void
     {
-        $campaign = Campaign::current();
+        $this->otpRequired = (bool) config('game.otp.enabled');
 
-        $this->campaignId = $campaign?->id;
-        $this->otpRequired = $campaign?->otpRequired() ?? true;
+        $online = Campaign::online();
+        $fixed = null;
+
+        // QR scanné avant l'inscription : c'est lui qui désigne le jeu
+        if (($token = session('pending_scan_token')) && ($qr = QrCode::findByToken($token)) && $qr->campaign->isOnline()) {
+            $fixed = $qr->campaign;
+        }
+
+        $fixed ??= $online->firstWhere('slug', (string) request()->query('jeu'));
+        $fixed ??= $online->count() === 1 ? $online->first() : null;
+
+        $this->campaignId = $fixed?->id;
     }
 
     protected function rules(): array
     {
-        $name = ['required', 'string', 'min:2', 'max:80', 'regex:/^[\pL\pM\' -]+$/u'];
-
         $rules = [
-            'first_name' => $name,
-            'last_name' => $name,
+            // Pseudo : commence par une lettre ou un chiffre ; puis lettres, chiffres, espaces, . _ ' -
+            'pseudo' => ['required', 'string', 'min:2', 'max:30', "regex:/^[\\pL\\pM\\pN][\\pL\\pM\\pN _.'-]*$/u"],
             'phone' => ['required', 'string', 'max:25', 'phone:'.implode(',', config('game.phone_countries'))],
             'consent_rules' => ['accepted'],
-            'age_confirmed' => ['accepted'],
             'consent_marketing' => ['boolean'],
         ];
 
+        if (! $this->campaignId) {
+            $rules['chosenCampaignId'] = ['required', 'integer', Rule::in(Campaign::online()->pluck('id')->all())];
+        }
+
         if (! $this->otpRequired) {
-            $rules['pin'] = ['required', 'digits:'.config('game.pin.length'), 'confirmed', new NotWeakPin];
+            $rules['pin'] = ['required', 'digits:'.config('game.pin.length'), new NotWeakPin];
         }
 
         return $rules;
@@ -94,25 +103,27 @@ class Register extends Component
     protected function validationAttributes(): array
     {
         return [
-            'first_name' => 'prénom',
-            'last_name' => 'nom',
+            'pseudo' => 'pseudo',
             'phone' => 'numéro de téléphone',
             'consent_rules' => 'acceptation du règlement',
-            'age_confirmed' => 'confirmation de l\'âge',
-            'pin' => 'code PIN',
+            'pin' => 'code secret',
             'code' => 'code reçu par SMS',
+            'chosenCampaignId' => 'jeu',
         ];
     }
 
     public function submit(OtpService $otp): void
     {
-        $campaign = $this->campaign();
-
-        if (! $campaign || ! $this->attemptThrottled('register:'.request()->ip(), 20, 3600)) {
+        if (! $this->attemptThrottled('register:'.request()->ip(), 20, 3600)) {
             return;
         }
 
         $this->validate();
+        $campaign = $this->campaign();
+
+        if (! $campaign) {
+            return;
+        }
         $phone = $this->normalizedPhone();
 
         if ($phone === null) {
@@ -202,15 +213,19 @@ class Register extends Component
     {
         return view('livewire.participant.register', [
             'campaign' => $this->campaign(),
+            // Plusieurs jeux en ligne et aucun imposé : le participant choisit
+            'choices' => $this->campaignId ? collect() : Campaign::online(),
         ]);
     }
 
+    /** Jeu de l'inscription : imposé, ou choisi parmi les jeux en ligne. */
     private function campaign(): ?Campaign
     {
-        $campaign = $this->campaignId ? Campaign::query()->find($this->campaignId) : null;
+        $id = $this->campaignId ?? $this->chosenCampaignId;
+        $campaign = $id ? Campaign::query()->find($id) : null;
 
-        if (! $campaign || $campaign->availabilityAt(now()) === ScanResult::CampaignClosed) {
-            $this->addError('campaign', 'Les inscriptions sont fermées.');
+        if ($campaign && ! $campaign->isOnline()) {
+            $this->addError('campaign', 'Les inscriptions à ce jeu sont fermées.');
 
             return null;
         }
@@ -233,12 +248,12 @@ class Register extends Component
     {
         $participant = new Participant([
             'campaign_id' => $campaign->id,
-            'first_name' => Str::squish($this->first_name),
-            'last_name' => Str::squish($this->last_name),
+            'pseudo' => Str::squish($this->pseudo),
             'phone_e164' => $phone,
             'consent_rules_at' => now(),
             'consent_rules_version' => $campaign->regulation_version,
             'consent_marketing' => $this->consent_marketing,
+            // L'âge minimum est confirmé par la case du règlement (« … et j'ai au moins N ans »)
             'age_confirmed' => true,
             'device_id' => $this->deviceId(),
             'registration_ip' => request()->ip(),
@@ -266,7 +281,7 @@ class Register extends Component
             'marketing' => $this->consent_marketing,
         ], $participant);
 
-        $this->reset('pin', 'pin_confirmation', 'code');
+        $this->reset('pin', 'code');
         $this->loginAndRedirect($participant);
     }
 

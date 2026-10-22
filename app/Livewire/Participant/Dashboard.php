@@ -3,6 +3,7 @@
 namespace App\Livewire\Participant;
 
 use App\Models\Participant;
+use App\Support\GamesList;
 use App\Support\LetterTiles;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -30,6 +31,8 @@ class Dashboard extends Component
             'wordCount' => count($participant->campaign->wordLengths()),
             'availability' => $participant->campaign->availabilityAt(now()),
             'flash' => session('scan_outcome'),
+            // Autres jeux en ligne (même compte) : continuer ou rejoindre
+            'otherGames' => GamesList::for($participant)->reject(fn ($g) => $g['campaign']->id === $participant->campaign_id)->values(),
         ]);
     }
 }

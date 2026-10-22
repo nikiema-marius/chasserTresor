@@ -202,7 +202,7 @@ class ScanTest extends TestCase
         $token = $qrs[0]->plainToken();
 
         // Visiteur : jeton mis de côté, redirection vers l'inscription
-        $this->get('/s/'.$token)->assertRedirect(route('register'))->assertSessionHas('pending_scan_token', $token);
+        $this->get('/s/'.$token)->assertRedirect(route('register', ['jeu' => $campaign->slug]))->assertSessionHas('pending_scan_token', $token);
 
         // Participant connecté : scan validé, redirection vers le tableau de bord
         $participant = Participant::factory()->for($campaign)->create();
@@ -214,46 +214,59 @@ class ScanTest extends TestCase
         $this->assertSame(1, $participant->fresh()->letters_count);
     }
 
-    public function test_compte_d_une_ancienne_campagne_rejoint_le_jeu_en_cours_sans_reinscription(): void
+    public function test_deux_jeux_en_ligne_le_qr_choisit_le_jeu(): void
     {
-        // Ancienne campagne (démo) avec un participant inscrit (son PIN est conservé)
-        $old = Campaign::factory()->create();
-        $participant = Participant::factory()->for($old)->create(['phone_e164' => '+22670123456', 'first_name' => 'Zeus']);
-        $participant->forceFill(['pin_hash' => bcrypt('4826')])->save();
+        // ORANGE et SIAO en ligne en même temps ; Zeus joue à ORANGE (PIN conservé d'un jeu à l'autre)
+        [$orange, $orangeQrs] = $this->campaignWithQrCodes(['name' => 'ORANGE']);
+        [$siao, $siaoQrs] = $this->campaignWithQrCodes(['name' => 'SIAO']);
+        $zeus = Participant::factory()->for($orange)->create(['phone_e164' => '+22670123456', 'pseudo' => 'Zeus']);
+        $zeus->forceFill(['pin_hash' => bcrypt('4826')])->save();
+        $token = $siaoQrs[0]->plainToken();
 
-        // Nouvelle campagne publique « SIAO 2026 » et un de ses QR
-        [$new, $qrs] = $this->campaignWithQrCodes(['name' => 'SIAO 2026']);
-        $token = $qrs[0]->plainToken();
-
-        // Il scanne un QR du nouveau jeu : il reste connecté et arrive sur « Rejoindre le jeu »
-        $this->actingAs($participant, 'participant')
+        // Il scanne un QR de SIAO : il reste connecté et arrive sur « Rejoindre SIAO »
+        $this->actingAs($zeus, 'participant')
             ->get('/s/'.$token)
-            ->assertRedirect(route('join'))
+            ->assertRedirect(route('join', $siao))
             ->assertSessionHas('pending_scan_token', $token);
-        $this->assertAuthenticatedAs($participant, 'participant');
-        $this->get(route('join'))->assertOk()->assertSee('SIAO 2026')->assertSee('Re-bonjour Zeus');
+        $this->get(route('join', $siao))->assertOk()->assertSee('SIAO')->assertSee('Re-bonjour Zeus');
 
-        // Un clic (règlement accepté) : nouvelle participation, puis validation du QR en attente
-        \Livewire\Livewire::actingAs($participant, 'participant')
-            ->test(\App\Livewire\Participant\JoinCampaign::class)
-            ->call('join')->assertHasErrors(['consent_rules', 'age_confirmed'])
-            ->set('consent_rules', true)->set('age_confirmed', true)
+        // Un clic (règlement accepté) : participation à SIAO, puis validation du QR en attente
+        \Livewire\Livewire::actingAs($zeus, 'participant')
+            ->test(\App\Livewire\Participant\JoinCampaign::class, ['campaign' => $siao])
+            ->call('join')->assertHasErrors('consent_rules')
+            ->set('consent_rules', true)
             ->call('join')
             ->assertRedirect(route('scan.link', $token));
 
-        $participation = Participant::query()->where('campaign_id', $new->id)->where('phone_e164', '+22670123456')->firstOrFail();
-        $this->assertSame('Zeus', $participation->first_name);
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('4826', $participation->pin_hash), 'Le PIN est conservé');
-        $this->assertSame($new->regulation_version, $participation->consent_rules_version);
-        $this->assertAuthenticatedAs($participation, 'participant');
+        $zeusSiao = Participant::query()->where('campaign_id', $siao->id)->where('phone_e164', '+22670123456')->firstOrFail();
+        $this->assertSame('Zeus', $zeusSiao->pseudo);
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('4826', $zeusSiao->pin_hash), 'Le PIN est conservé');
 
         $this->get('/s/'.$token)->assertRedirect(route('dashboard'));
-        $this->assertSame(1, $participation->fresh()->letters_count);
-        $this->assertSame(0, $participant->fresh()->letters_count, 'L\'ancienne partie est inchangée');
+        $this->assertSame(1, $zeusSiao->fresh()->letters_count);
+        $this->assertSame(0, $zeus->fresh()->letters_count, 'La partie ORANGE est indépendante');
 
-        // Session encore sur l'ancien compte alors qu'il a déjà rejoint : bascule automatique
-        $this->actingAs($participant, 'participant')->get(route('dashboard'))->assertRedirect(route('dashboard'));
-        $this->assertAuthenticatedAs($participation, 'participant');
+        // Session sur SIAO, il scanne un QR d'ORANGE : bascule automatique, la lettre va dans ORANGE
+        $this->actingAs($zeusSiao, 'participant')->get('/s/'.$orangeQrs[0]->plainToken())->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($zeus, 'participant');
+        $this->assertSame(1, $zeus->fresh()->letters_count);
+
+        // Le tableau de bord propose l'autre jeu, et « Continuer ce jeu » rebascule sur SIAO
+        $this->get(route('dashboard'))->assertOk()->assertSee('Jeu : ', false)->assertSee('ORANGE')->assertSee('Continuer ce jeu');
+        $this->get(route('play', $siao))->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($zeusSiao, 'participant');
+    }
+
+    public function test_scanner_integre_bascule_sur_le_jeu_du_qr(): void
+    {
+        [$orange] = $this->campaignWithQrCodes(['name' => 'ORANGE']);
+        [, $siaoQrs] = $this->campaignWithQrCodes(['name' => 'SIAO']);
+        $participant = Participant::factory()->for($orange)->create();
+
+        \Livewire\Livewire::actingAs($participant, 'participant')
+            ->test(\App\Livewire\Participant\Scanner::class)
+            ->call('scan', $siaoQrs[0]->scanUrl())
+            ->assertRedirect(route('scan.link', $siaoQrs[0]->plainToken()));
     }
 
     public function test_scanner_livewire(): void
@@ -273,7 +286,7 @@ class ScanTest extends TestCase
 
     public function test_tableau_de_bord_groupe_les_mots_de_l_expression(): void
     {
-        $campaign = Campaign::factory()->current()->withWord('MAX IT')->create(['letters_display' => 'ordered']);
+        $campaign = Campaign::factory()->withWord('MAX IT')->create(['letters_display' => 'ordered']);
         $participant = Participant::factory()->for($campaign)->create();
         $qr = QrCode::factory()->forLetter($campaign->letters()->where('position', 4)->first())->create(); // le I
         $this->scan($participant, $qr);

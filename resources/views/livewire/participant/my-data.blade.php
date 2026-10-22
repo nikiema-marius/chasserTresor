@@ -3,7 +3,7 @@
 
     <section class="card mt-4">
         <dl class="grid gap-3 text-sm">
-            <div><dt class="text-gray-500">Nom</dt><dd class="font-semibold">{{ $participant->full_name }}</dd></div>
+            <div><dt class="text-gray-500">Pseudo</dt><dd class="font-semibold">{{ $participant->pseudo }}</dd></div>
             <div><dt class="text-gray-500">Téléphone</dt><dd class="font-semibold">{{ \App\Support\Phone::display($participant->phone_e164) }}</dd></div>
             <div><dt class="text-gray-500">Inscrit le</dt><dd class="font-semibold">{{ $participant->created_at->setTimezone(config('game.display_timezone'))->translatedFormat('j F Y à H\hi') }}</dd></div>
             <div><dt class="text-gray-500">Règlement accepté</dt><dd class="font-semibold">Version {{ $participant->consent_rules_version }}</dd></div>

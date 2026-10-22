@@ -31,7 +31,7 @@ class ParticipantPagesTest extends TestCase
     public function test_pages_du_participant(): void
     {
         [$campaign, $qrs] = $this->campaignWithQrCodes();
-        $participant = Participant::factory()->for($campaign)->create(['first_name' => 'Aminata']);
+        $participant = Participant::factory()->for($campaign)->create(['pseudo' => 'Aminata']);
         $this->scan($participant, $qrs[0]);
 
         $this->actingAs($participant, 'participant');
@@ -63,7 +63,7 @@ class ParticipantPagesTest extends TestCase
     public function test_toutes_les_lettres_suffisent_pour_gagner(): void
     {
         [$campaign, $qrs] = $this->campaignWithQrCodes();
-        $participant = Participant::factory()->for($campaign)->create(['first_name' => 'Awa']);
+        $participant = Participant::factory()->for($campaign)->create(['pseudo' => 'Awa']);
 
         foreach (array_slice($qrs, 0, 6) as $qr) {
             $this->scan($participant, $qr);
@@ -100,7 +100,7 @@ class ParticipantPagesTest extends TestCase
             ->test(\App\Livewire\Admin\Prizes\Index::class, ['campaign' => $campaign])
             // Recherche par code de vérification (insensible à la casse)
             ->set('search', strtolower($winner->fresh()->prizeCode()))
-            ->assertSee($winner->full_name)
+            ->assertSee($winner->pseudo)
             ->call('claim', $winner->id)
             ->assertDispatched('notify', type: 'success');
 

@@ -3,7 +3,7 @@
 
     <a href="{{ route('admin.participants', $participant->campaign_id) }}" class="text-sm underline">← Participants</a>
     <div class="mt-2 flex flex-wrap items-center gap-3">
-        <h1 class="text-2xl font-black">{{ $participant->full_name }}</h1>
+        <h1 class="text-2xl font-black">{{ $participant->pseudo }}</h1>
         <span class="badge bg-gray-100">{{ $participant->status->label() }}</span>
         @if ($participant->anonymized_at) <span class="badge bg-gray-800 text-white">Anonymisé</span> @endif
         @if ($participant->suspicion_score >= $threshold) <span class="badge bg-red-100 text-red-900">Suspect ({{ $participant->suspicion_score }})</span> @endif
@@ -14,7 +14,7 @@
             <h2 class="font-bold">Identité</h2>
             <dl class="mt-3 grid gap-2 text-sm">
                 <div><dt class="text-gray-500">Téléphone</dt><dd class="font-mono">{{ $canSeePhone ? $participant->phone_e164 : $participant->masked_phone }}</dd></div>
-                <div><dt class="text-gray-500">Téléphone vérifié</dt><dd>{{ $participant->phone_verified_at ? 'Oui (SMS)' : 'Non (PIN)' }}</dd></div>
+                <div><dt class="text-gray-500">Téléphone vérifié</dt><dd>{{ $participant->phone_verified_at ? 'Oui (SMS)' : 'Non (code secret)' }}</dd></div>
                 <div><dt class="text-gray-500">Inscrit le</dt><dd>{{ $participant->created_at->setTimezone($tz)->format('d/m/Y H:i:s') }}</dd></div>
                 <div><dt class="text-gray-500">Règlement</dt><dd>v{{ $participant->consent_rules_version }} · marketing : {{ $participant->consent_marketing ? 'oui' : 'non' }}</dd></div>
                 <div><dt class="text-gray-500">IP d'inscription</dt><dd class="font-mono text-xs">{{ $participant->registration_ip ?? '—' }}</dd></div>
@@ -51,7 +51,7 @@
                 <p class="mt-3 text-sm font-semibold">Même appareil :</p>
                 <ul class="text-sm">
                     @foreach ($sameDevice as $other)
-                        <li><a href="{{ route('admin.participants.show', $other) }}" class="underline">{{ $other->full_name }} (#{{ $other->id }})</a></li>
+                        <li><a href="{{ route('admin.participants.show', $other) }}" class="underline">{{ $other->pseudo }} (#{{ $other->id }})</a></li>
                     @endforeach
                 </ul>
             @endif

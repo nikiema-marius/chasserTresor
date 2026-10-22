@@ -15,17 +15,6 @@ class Index extends Component
 {
     use InteractsWithAdmin;
 
-    public function makeCurrent(int $id): void
-    {
-        $this->authorizeAdmin('manage');
-
-        $campaign = Campaign::query()->findOrFail($id);
-        $campaign->makeCurrent();
-
-        $this->audit('campaign.made_current', $campaign);
-        $this->toast("« {$campaign->name} » est la campagne publique.");
-    }
-
     public function setStatus(int $id, string $status): void
     {
         $this->authorizeAdmin('manage');
@@ -44,16 +33,10 @@ class Index extends Component
 
         $this->audit('campaign.status_changed', $campaign, ['from' => $previous->value, 'to' => $target->value]);
 
-        // Activer une campagne en fait le jeu proposé aux participants (un seul jeu public à la fois)
-        if ($target === CampaignStatus::Active && ! $campaign->is_current) {
-            $campaign->makeCurrent();
-            $this->audit('campaign.made_current', $campaign, ['reason' => 'activation']);
-            $this->toast("« {$campaign->name} » est active : c'est maintenant le jeu proposé aux participants.");
-
-            return;
-        }
-
-        $this->toast("Statut : {$target->label()}.");
+        // Plusieurs campagnes peuvent être actives (en ligne) en même temps
+        $this->toast($target === CampaignStatus::Active
+            ? "« {$campaign->name} » est en ligne : elle apparaît dans la liste des jeux des participants."
+            : "« {$campaign->name} » : {$target->label()}.");
     }
 
     public function render()

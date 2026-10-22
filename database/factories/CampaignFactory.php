@@ -23,6 +23,7 @@ class CampaignFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name),
+            'color' => '#FF7900',
             'status' => CampaignStatus::Active,
             'starts_at' => now()->subDay(),
             'ends_at' => now()->addDays(10),
@@ -54,10 +55,6 @@ class CampaignFactory extends Factory
         });
     }
 
-    public function current(): static
-    {
-        return $this->afterCreating(fn (Campaign $campaign) => $campaign->makeCurrent());
-    }
 
     public function firstCome(): static
     {

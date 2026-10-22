@@ -21,10 +21,10 @@ class Dashboard extends Component
 
     public function render(StatsService $stats)
     {
-        $campaigns = Campaign::query()->orderByDesc('starts_at')->get(['id', 'name', 'is_current']);
+        $campaigns = Campaign::query()->orderByDesc('starts_at')->get(['id', 'name', 'status', 'ends_at']);
         $campaign = $this->campaignId
             ? Campaign::query()->find($this->campaignId)
-            : (Campaign::current() ?? $campaigns->first());
+            : (Campaign::online()->first() ?? $campaigns->first());
 
         return view('livewire.admin.dashboard', [
             'campaigns' => $campaigns,

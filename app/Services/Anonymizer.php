@@ -27,8 +27,7 @@ class Anonymizer
 
         DB::transaction(function () use ($participant, $phone) {
             $participant->forceFill([
-                'first_name' => 'Anonyme',
-                'last_name' => '#'.$participant->id,
+                'pseudo' => 'Anonyme #'.$participant->id,
                 'phone_e164' => 'ANON-'.$participant->id,
                 'pin_hash' => null,
                 'device_id' => null,

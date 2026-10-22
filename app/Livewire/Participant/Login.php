@@ -8,6 +8,7 @@ use App\Livewire\Concerns\AuthenticatesParticipant;
 use App\Livewire\Concerns\ThrottlesActions;
 use App\Models\Campaign;
 use App\Models\Participant;
+use App\Models\QrCode;
 use App\Services\AuditLogger;
 use App\Services\OtpService;
 use App\Support\Phone;
@@ -48,7 +49,7 @@ class Login extends Component
 
     public function mount(): void
     {
-        $this->otpRequired = Campaign::current()?->otpRequired() ?? true;
+        $this->otpRequired = (bool) config('game.otp.enabled');
     }
 
     public function submit(OtpService $otp, AuditLogger $audit): void
@@ -60,7 +61,7 @@ class Login extends Component
         $this->validate([
             'phone' => ['required', 'string', 'max:25'],
             'pin' => $this->otpRequired ? ['nullable'] : ['required', 'digits:'.config('game.pin.length')],
-        ], attributes: ['phone' => 'numéro de téléphone', 'pin' => 'code PIN']);
+        ], attributes: ['phone' => 'numéro de téléphone', 'pin' => 'code secret']);
 
         $phone = Phone::normalize($this->phone);
         $participant = $phone ? $this->findAccount($phone) : null;
@@ -123,17 +124,19 @@ class Login extends Component
     }
 
     /**
-     * Compte du participant : sa participation au jeu en cours si elle existe,
-     * sinon sa participation la plus récente (il rejoindra alors le jeu en cours en un clic).
+     * Participation sur laquelle connecter le compte : celle du jeu du QR scanné s'il y en a un,
+     * sinon la plus récente d'un jeu en ligne, sinon la plus récente tout court.
      */
     private function findAccount(string $phone): ?Participant
     {
-        $currentId = Campaign::current()?->id;
+        $preferred = ($token = session('pending_scan_token')) ? QrCode::findByToken($token)?->campaign_id : null;
+        $onlineIds = Campaign::online()->pluck('id')->all() ?: [0];
 
         return Participant::query()
             ->where('phone_e164', $phone)
             ->whereNull('anonymized_at')
-            ->orderByRaw('campaign_id = ? DESC', [(int) $currentId])
+            ->orderByRaw('campaign_id = ? DESC', [(int) $preferred])
+            ->orderByRaw('campaign_id IN ('.implode(',', array_map('intval', $onlineIds)).') DESC')
             ->latest('id')
             ->first();
     }
@@ -160,8 +163,8 @@ class Login extends Component
             }
 
             $this->addError('pin', $participant->pin_hash
-                ? 'Code PIN incorrect.'
-                : 'Ce compte n\'a pas de code PIN. Rends-toi au stand Orange Money.');
+                ? 'Code secret incorrect.'
+                : 'Ce compte n\'a pas de code secret. Rends-toi au stand Orange Money.');
 
             return;
         }

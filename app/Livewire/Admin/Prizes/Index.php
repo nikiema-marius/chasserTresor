@@ -96,7 +96,7 @@ class Index extends Component
             $digits = preg_replace('/\D/', '', $term);
 
             $winners->where(function ($q) use ($byCode, $term, $digits) {
-                $q->where('first_name', 'like', "%{$term}%")->orWhere('last_name', 'like', "%{$term}%");
+                $q->where('pseudo', 'like', "%{$term}%");
 
                 if (strlen($digits) >= 4) {
                     $q->orWhere('phone_e164', 'like', "%{$digits}%");

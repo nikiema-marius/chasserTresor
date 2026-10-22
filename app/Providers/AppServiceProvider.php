@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use App\Contracts\SmsDriver;
 use App\Http\Middleware\EnsureAdminSecurity;
-use App\Http\Middleware\EnsureCurrentCampaignParticipant;
 use App\Models\Admin;
 use App\Sms\LogSmsDriver;
 use App\Sms\NullSmsDriver;
@@ -101,6 +100,6 @@ class AppServiceProvider extends ServiceProvider
             ->name('livewire.update'));
 
         // Réappliqué à chaque requête Livewire (actions comprises)
-        Livewire::addPersistentMiddleware([EnsureAdminSecurity::class, EnsureCurrentCampaignParticipant::class]);
+        Livewire::addPersistentMiddleware([EnsureAdminSecurity::class]);
     }
 }

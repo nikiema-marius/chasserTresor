@@ -4,7 +4,7 @@
     <div class="mt-4 flex items-center gap-4">
         <x-avatar :participant="$participant" size="size-16 text-2xl" />
         <div>
-            <p class="text-lg font-black">{{ $participant->full_name }}</p>
+            <p class="text-lg font-black">{{ $participant->pseudo }}</p>
             <p class="text-sm text-gray-600">{{ \App\Support\Phone::display($participant->phone_e164) }}</p>
         </div>
     </div>

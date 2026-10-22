@@ -56,33 +56,19 @@
         @endif
     </div>
 
-    @if ($campaign && $availability === \App\Enums\ScanResult::CampaignNotStarted)
-        <div class="card mt-4 border-l-4 border-om text-center text-sm">
-            <p class="font-semibold">Le jeu démarre le {{ $campaign->starts_at->setTimezone(config('game.display_timezone'))->translatedFormat('l j F à H\hi') }}.</p>
-            <p class="mt-1 text-gray-600">Tu peux déjà t'inscrire.</p>
-        </div>
-    @elseif (! $campaign || $availability === \App\Enums\ScanResult::CampaignClosed)
-        <div class="card mt-4 text-center text-sm font-semibold">
-            {{ $campaign ? 'Le jeu est terminé. Merci à tous les participants !' : "Le jeu n'est pas encore ouvert. Reviens bientôt !" }}
-        </div>
+    @if ($games->isEmpty())
+        <div class="card mt-5 text-center text-sm font-semibold">Aucun jeu n'est en ligne pour le moment. Reviens bientôt !</div>
+    @else
+        <h2 class="mt-6 text-lg font-black">{{ $games->count() > 1 ? 'Les jeux en ligne' : 'Le jeu en ligne' }}</h2>
+        <x-games-list :games="$games" :current="auth('participant')->user()" class="mt-3" />
     @endif
 
     <div class="mt-5 grid gap-3">
         @auth('participant')
-            <a href="{{ route('dashboard') }}" class="btn btn-primary w-full text-lg">Continuer ma partie <span aria-hidden="true">→</span></a>
+            <a href="{{ route('dashboard') }}" class="btn btn-ghost w-full">Ma partie en cours</a>
         @else
-            @if ($campaign && $availability !== \App\Enums\ScanResult::CampaignClosed)
-                <a href="{{ route('register') }}" class="btn btn-primary w-full text-lg">Participer <span aria-hidden="true">→</span></a>
-            @endif
             <a href="{{ route('regulation') }}" class="btn btn-ghost w-full">Voir le règlement complet</a>
             <p class="text-center text-sm">Déjà inscrit ? <a href="{{ route('login') }}" class="font-bold text-om-dark underline">Se connecter</a></p>
         @endauth
     </div>
-
-    @if ($campaign?->rules_md)
-        <section class="card mt-6">
-            <h2 class="mb-3 text-lg font-black">Les règles</h2>
-            <div class="prose-rules">{!! $campaign->rulesHtml() !!}</div>
-        </section>
-    @endif
 </x-layouts.app>

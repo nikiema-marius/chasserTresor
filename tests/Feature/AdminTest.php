@@ -218,22 +218,50 @@ class AdminTest extends TestCase
         $this->assertSame('draft', $campaign->fresh()->status->value);
     }
 
-    public function test_activer_une_campagne_la_rend_publique(): void
+    public function test_plusieurs_campagnes_actives_en_meme_temps(): void
     {
-        // Ancienne campagne publique mais clôturée, nouvelle campagne prête
-        $old = Campaign::factory()->current()->closed()->create();
-        [$new] = $this->campaignWithQrCodes(['status' => 'draft', 'regulation_md' => 'Règlement']);
-        $old->makeCurrent();
+        // ORANGE est déjà en ligne ; on active SIAO : les deux restent en ligne
+        [$orange] = $this->campaignWithQrCodes(['name' => 'ORANGE']);
+        [$siao] = $this->campaignWithQrCodes(['name' => 'SIAO', 'status' => 'draft', 'regulation_md' => 'Règlement']);
 
-        $component = Livewire::actingAs(Admin::factory()->create(), 'admin')
+        Livewire::actingAs(Admin::factory()->create(), 'admin')
             ->test(CampaignsIndex::class)
-            ->assertSee('les participants voient « Jeu terminé »', false)
-            ->call('setStatus', $new->id, 'active')
-            ->assertDispatched('notify', type: 'success');
+            ->assertSee('1 jeu en ligne')
+            ->call('setStatus', $siao->id, 'active')
+            ->assertDispatched('notify', type: 'success')
+            ->assertSee('2 jeux en ligne');
 
-        $this->assertTrue(Campaign::current()->is($new));
-        $this->assertSame('active', $new->fresh()->status->value);
-        $this->assertNull($old->fresh()->is_current);
+        $this->assertTrue($orange->fresh()->isOnline());
+        $this->assertTrue($siao->fresh()->isOnline());
+    }
+
+    public function test_couleur_et_nom_du_jeu_sur_les_qr(): void
+    {
+        $admin = Admin::factory()->create();
+
+        // ORANGE est en ligne en orange : la couleur proposée pour le nouveau jeu est différente
+        Campaign::factory()->withWord('ORANGE')->create(['name' => 'ORANGE', 'color' => '#FF7900']);
+        $form = Livewire::actingAs($admin, 'admin')->test(Form::class);
+        $this->assertNotSame('#FF7900', $form->get('color'));
+
+        $form->set('name', 'SIAO')->set('word', 'SIAO')->set('color', '#0072ce')->call('save')->assertHasNoErrors();
+        $siao = Campaign::query()->where('name', 'SIAO')->firstOrFail();
+        $this->assertSame('#0072CE', $siao->color);
+        $this->assertSame('#FFFFFF', $siao->textColor(), 'Texte blanc sur bleu foncé');
+        $this->assertSame('#111111', (new Campaign(['color' => '#FF7900']))->textColor(), 'Texte noir sur orange');
+
+        // Couleur invalide refusée
+        Livewire::actingAs($admin, 'admin')->test(Form::class, ['campaign' => $siao])->set('color', 'rouge')->call('save')->assertHasErrors('color');
+
+        // Le PDF d'impression porte le nom du jeu
+        $pdf = $this->actingAs($admin, 'admin')->get(route('admin.qr-codes.pdf', $siao));
+        $pdf->assertOk();
+        $html = view('admin.qr-print', [
+            'campaign' => $siao, 'color' => $siao->color, 'textColor' => $siao->textColor(),
+            'pages' => collect([['label' => 'Stand 1', 'code' => 'X', 'image' => 'data:,']])->chunk(6),
+        ])->render();
+        $this->assertStringContainsString('Jeu SIAO', $html);
+        $this->assertStringContainsString('#0072CE', $html);
     }
 
     public function test_generation_et_cycle_de_vie_des_qr(): void
@@ -279,7 +307,7 @@ class AdminTest extends TestCase
     public function test_export_csv_masque_les_telephones(): void
     {
         [$campaign] = $this->campaignWithQrCodes();
-        Participant::factory()->for($campaign)->create(['phone_e164' => '+22670123456', 'first_name' => '=HYPERLINK("x")']);
+        Participant::factory()->for($campaign)->create(['phone_e164' => '+22670123456', 'pseudo' => '=HYPERLINK("x")']);
         $admin = $this->superAdmin();
 
         $masked = $this->actingAs($admin, 'admin')->get(route('admin.exports.participants', $campaign))->streamedContent();

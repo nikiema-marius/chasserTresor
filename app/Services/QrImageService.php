@@ -72,6 +72,8 @@ class QrImageService
 
         return Pdf::loadView('admin.qr-print', [
             'campaign' => $campaign,
+            'color' => strtoupper($campaign->color ?: '#FF7900'),
+            'textColor' => $campaign->textColor(),
             'pages' => $items->chunk(6),
         ])->setPaper('a4')->output();
     }
@@ -79,7 +81,8 @@ class QrImageService
     /** @return Collection<int, QrCode> */
     private function printable(Campaign $campaign): Collection
     {
-        return $campaign->qrCodes()->active()->with('campaignLetter')->orderBy('campaign_letter_id')->orderBy('id')->get();
+        return $campaign->qrCodes()->active()->with('campaignLetter')->orderBy('campaign_letter_id')->orderBy('id')->get()
+            ->each(fn (QrCode $qr) => $qr->setRelation('campaign', $campaign));
     }
 
     private function builder(QrCode $qr, $writer, int $size): Builder
@@ -93,7 +96,8 @@ class QrImageService
             margin: (int) round($size / 20),
             foregroundColor: new Color(0, 0, 0),
             backgroundColor: new Color(255, 255, 255),
-            labelText: (string) $qr->formattedManualCode(),
+            // Nom du jeu + code manuel : distingue les QR de jeux différents (lettres communes)
+            labelText: Str::limit(Str::ascii($qr->campaign->name), 18, '').' · '.$qr->formattedManualCode(),
             labelTextColor: new Color(0, 0, 0),
         );
     }

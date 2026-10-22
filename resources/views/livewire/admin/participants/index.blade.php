@@ -41,7 +41,7 @@
                 @forelse ($participants as $p)
                     <tr wire:key="p-{{ $p->id }}" @class(['bg-red-50' => $p->suspicion_score >= $threshold])>
                         <td>{{ $p->id }}</td>
-                        <td><a href="{{ route('admin.participants.show', $p) }}" class="font-semibold hover:underline">{{ $p->full_name }}</a></td>
+                        <td><a href="{{ route('admin.participants.show', $p) }}" class="font-semibold hover:underline">{{ $p->pseudo }}</a></td>
                         <td class="font-mono text-xs">{{ $p->masked_phone }}</td>
                         <td class="text-xs whitespace-nowrap">{{ $p->created_at->setTimezone(config('game.display_timezone'))->format('d/m H:i') }}</td>
                         <td class="min-w-36">

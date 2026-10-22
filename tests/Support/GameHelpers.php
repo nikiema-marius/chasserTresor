@@ -21,7 +21,7 @@ trait GameHelpers
      */
     protected function campaignWithQrCodes(array $attributes = [], int $perLetter = 1): array
     {
-        $campaign = Campaign::factory()->current()->create($attributes);
+        $campaign = Campaign::factory()->create($attributes);
         $qrCodes = [];
 
         foreach ($campaign->letters as $letter) {

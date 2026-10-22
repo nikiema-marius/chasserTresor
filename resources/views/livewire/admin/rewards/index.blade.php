@@ -70,7 +70,7 @@
                     @foreach ($draw->winners as $w)
                         <tr wire:key="w-{{ $w->id }}">
                             <td class="font-bold">{{ $w->rank }}</td>
-                            <td><a href="{{ route('admin.participants.show', $w->participant) }}" class="underline">{{ $w->participant->full_name }}</a></td>
+                            <td><a href="{{ route('admin.participants.show', $w->participant) }}" class="underline">{{ $w->participant->pseudo }}</a></td>
                             <td class="font-mono text-xs">{{ $w->participant->masked_phone }}</td>
                             <td class="text-xs">{{ $w->participant->solved_at?->setTimezone($tz)->format('d/m H:i:s.v') }}</td>
                             <td class="text-xs">{{ $w->participant->solved_at ? $w->participant->created_at->diffForHumans($w->participant->solved_at, syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, parts: 2) : '' }}</td>

@@ -60,8 +60,7 @@ class Index extends Component
         if ($term = trim(mb_substr($this->search, 0, 50))) {
             $digits = preg_replace('/\D/', '', $term);
             $query->where(function ($q) use ($term, $digits) {
-                $q->where('first_name', 'like', "%{$term}%")
-                    ->orWhere('last_name', 'like', "%{$term}%");
+                $q->where('pseudo', 'like', "%{$term}%");
 
                 if (strlen($digits) >= 4) {
                     $q->orWhere('phone_e164', 'like', "%{$digits}%");

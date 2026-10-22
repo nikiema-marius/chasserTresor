@@ -23,10 +23,14 @@ class Campaign extends Model
     /** @use HasFactory<CampaignFactory> */
     use HasFactory, SoftDeletes;
 
+    /** Couleurs de repérage des jeux (bien distinctes, lisibles à l'impression). */
+    public const PALETTE = ['#FF7900', '#0072CE', '#16A34A', '#7C3AED', '#DC2626', '#0D9488', '#CA8A04', '#DB2777'];
+
     // mystery_word et word_length ne sont modifiables que via applyMysteryWord()
     protected $fillable = [
         'name',
         'slug',
+        'color',
         'status',
         'starts_at',
         'ends_at',
@@ -59,7 +63,6 @@ class Campaign extends Model
             'word_locked_at' => 'datetime',
             'otp_required' => 'boolean',
             'require_word_entry' => 'boolean',
-            'is_current' => 'boolean',
         ];
     }
 
@@ -98,30 +101,48 @@ class Campaign extends Model
     }
 
     // ------------------------------------------------------------------
-    // Campagne courante
+    // Campagnes en ligne (plusieurs possibles en même temps)
     // ------------------------------------------------------------------
 
-    public function scopeCurrent(Builder $query): Builder
+    /** En ligne : active et pas encore terminée (le début peut être à venir). */
+    public function scopeOnline(Builder $query): Builder
     {
-        return $query->where('is_current', 1);
+        return $query->where('status', CampaignStatus::Active)->where('ends_at', '>', now());
     }
 
-    public static function current(): ?self
+    /** @return \Illuminate\Support\Collection<int, self> */
+    public static function online(): \Illuminate\Support\Collection
     {
-        return static::query()->current()->first();
+        return static::query()->online()->orderBy('starts_at')->orderBy('id')->get();
     }
 
-    /**
-     * Définit cette campagne comme campagne publique courante (une seule possible).
-     */
-    public function makeCurrent(): void
+    public function isOnline(): bool
     {
-        DB::transaction(function () {
-            static::query()->whereKeyNot($this->getKey())->where('is_current', 1)->update(['is_current' => null]);
-            // Écriture directe : l'instance en mémoire peut se croire déjà publique alors que la base dit l'inverse
-            static::query()->whereKey($this->getKey())->update(['is_current' => 1]);
-            $this->forceFill(['is_current' => 1])->syncOriginalAttribute('is_current');
-        });
+        return $this->status === CampaignStatus::Active && $this->ends_at->isFuture();
+    }
+
+    // ------------------------------------------------------------------
+    // Couleur de repérage
+    // ------------------------------------------------------------------
+
+    /** Couleur proposée pour un nouveau jeu : la première de la palette non utilisée par un jeu en ligne. */
+    public static function suggestColor(): string
+    {
+        $used = static::online()->pluck('color')->map(fn ($c) => strtoupper((string) $c))->all();
+
+        return collect(self::PALETTE)->first(fn ($c) => ! in_array($c, $used, true)) ?? self::PALETTE[0];
+    }
+
+    /** Texte lisible sur la couleur du jeu : noir sur fond clair, blanc sur fond foncé. */
+    public function textColor(): string
+    {
+        [$r, $g, $b] = sscanf(strtoupper($this->color ?: '#FF7900'), '#%02X%02X%02X') ?: [255, 121, 0];
+
+        // Luminance relative (WCAG) : seuil choisi pour garder un contraste suffisant
+        $lin = fn (int $v) => ($v /= 255) <= 0.03928 ? $v / 12.92 : (($v + 0.055) / 1.055) ** 2.4;
+        $luminance = 0.2126 * $lin($r) + 0.7152 * $lin($g) + 0.0722 * $lin($b);
+
+        return $luminance > 0.25 ? '#111111' : '#FFFFFF';
     }
 
     // ------------------------------------------------------------------
@@ -158,9 +179,13 @@ class Campaign extends Model
         return $this->availabilityAt($now) === null;
     }
 
+    /**
+     * Mode de connexion (SMS ou PIN) : réglage global GAME_OTP_ENABLED.
+     * Un même compte joue à plusieurs campagnes : il ne peut pas changer de règle selon le jeu.
+     */
     public function otpRequired(): bool
     {
-        return $this->otp_required ?? (bool) config('game.otp.enabled');
+        return (bool) config('game.otp.enabled');
     }
 
     public function isWordLocked(): bool

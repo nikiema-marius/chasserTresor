@@ -9,6 +9,25 @@
                 <input id="name" type="text" wire:model="name" class="field" maxlength="150">
                 @error('name') <p class="error">{{ $message }}</p> @enderror
             </div>
+            <div>
+                <p class="label">Couleur du jeu</p>
+                <div class="flex flex-wrap items-center gap-2">
+                    @foreach (\App\Models\Campaign::PALETTE as $swatch)
+                        <button type="button" wire:click="$set('color', '{{ $swatch }}')"
+                                @class(['size-9 rounded-full ring-offset-2', 'ring-4 ring-ink' => strtoupper($color) === $swatch])
+                                style="background: {{ $swatch }}" aria-label="Couleur {{ $swatch }}"></button>
+                    @endforeach
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="color" wire:model.live="color" class="h-9 w-12 cursor-pointer rounded border border-gray-300" aria-label="Autre couleur">
+                        autre
+                    </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">
+                    Imprimée sur les QR codes de ce jeu et affichée aux participants : utilisez une couleur différente pour chaque jeu en ligne
+                    (ex. ORANGE en orange, SIAO en bleu) pour ne pas confondre les QR des lettres communes.
+                </p>
+                @error('color') <p class="error">{{ $message }}</p> @enderror
+            </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="label" for="starts_at">Début (heure de Ouagadougou)</label>
@@ -126,12 +145,11 @@
                     @error('min_seconds_between_scans') <p class="error">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="label" for="otp_required">Vérification SMS (OTP)</label>
-                    <select id="otp_required" wire:model="otp_required" class="field">
-                        <option value="inherit">Selon la configuration serveur ({{ $otpDefault ? 'activée' : 'désactivée' }})</option>
-                        <option value="1">Obligatoire</option>
-                        <option value="0">Désactivée (code PIN)</option>
-                    </select>
+                    <p class="label">Connexion des participants</p>
+                    <p class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        {{ $otpDefault ? 'Code SMS' : 'Code secret (4 chiffres)' }} — réglage commun à tous les jeux
+                        (un même compte joue à plusieurs campagnes). Modifiable via <code>GAME_OTP_ENABLED</code>.
+                    </p>
                 </div>
                 <div>
                     <label class="label" for="min_age">Âge minimum</label>

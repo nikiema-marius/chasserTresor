@@ -30,11 +30,11 @@ class SecurityAndPrivacyTest extends TestCase
 
     public function test_le_markdown_admin_ne_peut_pas_injecter_de_script(): void
     {
-        Campaign::factory()->current()->create([
-            'rules_md' => "Règle **importante**\n\n<script>alert(1)</script> [lien](javascript:alert(1))",
+        $campaign = Campaign::factory()->create([
+            'regulation_md' => "Règle **importante**\n\n<script>alert(1)</script> [lien](javascript:alert(1))",
         ]);
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $html = $this->get(route('regulation', $campaign))->assertOk()->getContent();
 
         $this->assertStringContainsString('<strong>importante</strong>', $html);
         $this->assertStringNotContainsString('<script>alert(1)</script>', $html);
@@ -43,14 +43,14 @@ class SecurityAndPrivacyTest extends TestCase
 
     public function test_pages_publiques(): void
     {
-        Campaign::factory()->current()->create(['regulation_md' => '## Article 1']);
+        Campaign::factory()->create(['regulation_md' => '## Article 1']);
 
         $this->get('/')->assertOk()->assertSee('La chasse au trésor');
         $this->get('/reglement')->assertOk()->assertSee('Article 1');
         $this->get('/inscription')->assertOk();
         $this->get('/connexion')->assertOk();
         $this->get('/jeu')->assertRedirect(route('register'));
-        $this->get('/s/'.str_repeat('a', 32))->assertRedirect(route('register'));
+        $this->get('/s/'.str_repeat('a', 32))->assertRedirect(route('home')); // QR inconnu
     }
 
     public function test_export_de_mes_donnees(): void
@@ -66,7 +66,7 @@ class SecurityAndPrivacyTest extends TestCase
     public function test_suppression_de_mes_donnees(): void
     {
         [$campaign, $qrs] = $this->campaignWithQrCodes();
-        $participant = Participant::factory()->for($campaign)->create(['first_name' => 'Awa', 'phone_e164' => '+22670123456']);
+        $participant = Participant::factory()->for($campaign)->create(['pseudo' => 'Awa', 'phone_e164' => '+22670123456']);
         $this->scan($participant, $qrs[0]);
 
         Livewire::actingAs($participant, 'participant')
@@ -76,7 +76,7 @@ class SecurityAndPrivacyTest extends TestCase
 
         $participant->refresh();
         $this->assertNotNull($participant->anonymized_at);
-        $this->assertSame('Anonyme', $participant->first_name);
+        $this->assertStringStartsWith('Anonyme', $participant->pseudo);
         $this->assertStringStartsWith('ANON-', $participant->phone_e164);
         $this->assertNull(Scan::query()->where('participant_id', $participant->id)->value('ip'));
         $this->assertSame(1, $participant->letters_count, 'Les statistiques de jeu sont conservées');

@@ -34,12 +34,12 @@ class ExportController extends Controller
 
         return CsvWriter::download(
             $this->filename($campaign, 'participants'),
-            ['ID', 'Prénom', 'Nom', 'Téléphone', 'Inscrit le', 'Lettres', 'Complété le', 'Mot trouvé le',
+            ['ID', 'Pseudo', 'Téléphone', 'Inscrit le', 'Lettres', 'Complété le', 'Mot trouvé le',
                 'Tentatives', 'Statut', 'Score suspicion', 'Consentement Orange Money'],
             function () use ($query, $full) {
                 foreach ($query->lazyById(500) as $p) {
                     yield [
-                        $p->id, $p->first_name, $p->last_name,
+                        $p->id, $p->pseudo,
                         $full ? $p->phone_e164 : $p->masked_phone,
                         $p->created_at, $p->letters_count, $p->completed_at, $p->solved_at,
                         $p->word_attempts, $p->status->label(), $p->suspicion_score, $p->consent_marketing,
@@ -79,11 +79,11 @@ class ExportController extends Controller
         return CsvWriter::download(
             $this->filename($campaign, 'gagnants'),
             ['Attribution', 'Mode', 'Lot', 'Statut attribution', 'Rang', 'Statut gagnant', 'Participant',
-                'Prénom', 'Nom', 'Téléphone', 'Mot trouvé le', 'Lot remis le'],
+                'Pseudo', 'Téléphone', 'Mot trouvé le', 'Lot remis le'],
             function () use ($query, $full) {
                 foreach ($query->lazyById(500) as $w) {
                     yield [$w->reward_draw_id, $w->draw->mode->label(), $w->draw->prize_label, $w->draw->status->value,
-                        $w->rank, $w->status->label(), $w->participant_id, $w->participant->first_name, $w->participant->last_name,
+                        $w->rank, $w->status->label(), $w->participant_id, $w->participant->pseudo,
                         $full ? $w->participant->phone_e164 : $w->participant->masked_phone,
                         $w->participant->solved_at, $w->delivered_at];
                 }

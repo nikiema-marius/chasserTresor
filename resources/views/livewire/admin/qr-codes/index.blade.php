@@ -1,7 +1,7 @@
 <div>
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="text-2xl font-black">QR codes</h1>
+            <h1 class="flex items-center gap-2 text-2xl font-black"><span class="size-4 rounded-full" style="background: {{ $campaign->color }}" aria-hidden="true"></span>QR codes</h1>
             <p class="text-sm text-gray-500">{{ $campaign->name }} · mode par défaut : {{ $campaign->validation_mode->label() }}</p>
         </div>
         <div class="flex flex-wrap gap-2">

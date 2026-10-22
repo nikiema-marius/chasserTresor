@@ -20,8 +20,7 @@ class MyDataController extends Controller
             'exporte_le' => now()->toIso8601String(),
             'campagne' => $p->campaign->name,
             'identite' => [
-                'prenom' => $p->first_name,
-                'nom' => $p->last_name,
+                'pseudo' => $p->pseudo,
                 'telephone' => $p->phone_e164,
                 'telephone_verifie_le' => $p->phone_verified_at?->toIso8601String(),
             ],

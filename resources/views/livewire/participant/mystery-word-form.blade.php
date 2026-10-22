@@ -36,7 +36,7 @@
                 <div class="card mt-4 border-4 border-ink" x-data="{ now: '' }"
                      x-init="const tick = () => now = new Date().toLocaleTimeString('fr-FR'); tick(); setInterval(tick, 1000)">
                     <p class="text-xs font-bold tracking-wide text-gray-500 uppercase">Justificatif gagnant</p>
-                    <p class="mt-2 text-xl font-black">{{ $participant->full_name }}</p>
+                    <p class="mt-2 text-xl font-black">{{ $participant->pseudo }}</p>
                     <p class="text-sm text-gray-600">{{ $participant->masked_phone }} · {{ $campaign->name }}</p>
 
                     <p class="mt-4 text-xs text-gray-500">Code de vérification</p>

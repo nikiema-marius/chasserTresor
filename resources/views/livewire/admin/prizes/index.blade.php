@@ -21,7 +21,7 @@
         @forelse ($winners as $w)
             <div wire:key="w-{{ $w->id }}" @class(['card flex flex-wrap items-center justify-between gap-4', 'opacity-60' => $w->hasClaimedPrize()])>
                 <div>
-                    <p class="text-lg font-black">{{ $w->full_name }}</p>
+                    <p class="text-lg font-black">{{ $w->pseudo }}</p>
                     <p class="text-sm text-gray-600">{{ $w->masked_phone }} · toutes les lettres le {{ $w->solved_at->setTimezone($tz)->format('d/m à H:i') }}</p>
                     @unless ($w->isActive()) <p class="text-sm font-bold text-red-700">Participation {{ mb_strtolower($w->status->label()) }}</p> @endunless
                 </div>
@@ -34,7 +34,7 @@
                             <button wire:click="unclaim({{ $w->id }})" wire:confirm="Annuler cette remise ?" class="mt-1 text-xs underline">Annuler la remise</button>
                         @endcan
                     @elseif ($w->isActive())
-                        <button wire:click="claim({{ $w->id }})" wire:confirm="Confirmer la remise du gain à {{ $w->full_name }} ?" class="btn btn-primary">Remettre le gain</button>
+                        <button wire:click="claim({{ $w->id }})" wire:confirm="Confirmer la remise du gain à {{ $w->pseudo }} ?" class="btn btn-primary">Remettre le gain</button>
                     @endif
                 </div>
             </div>

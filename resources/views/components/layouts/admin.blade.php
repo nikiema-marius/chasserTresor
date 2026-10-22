@@ -2,7 +2,11 @@
 {{-- Layout de l'espace d'administration : barre latérale sombre (ordinateur), menu horizontal (mobile) --}}
 @php
     $admin = auth('admin')->user();
-    $current = \App\Models\Campaign::current() ?? \App\Models\Campaign::query()->latest('starts_at')->first();
+    // Campagne des liens du menu : celle de la page affichée, sinon le premier jeu en ligne, sinon la plus récente
+    $routeCampaign = request()->route('campaign');
+    $current = $routeCampaign instanceof \App\Models\Campaign
+        ? $routeCampaign
+        : (\App\Models\Campaign::online()->first() ?? \App\Models\Campaign::query()->latest('starts_at')->first());
     $links = array_values(array_filter([
         ['admin.dashboard', [], 'Tableau de bord', true, 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z'],
         ['admin.campaigns', [], 'Campagnes', true, 'M4 4h16v16H4zM4 9h16M9 4v16'],
@@ -36,6 +40,12 @@
             </a>
         </div>
 
+        @if ($current)
+            <p class="px-4 pb-2 text-xs text-white/60">
+                Campagne affichée : <strong class="text-white">{{ $current->name }}</strong>
+                <a href="{{ route('admin.campaigns') }}" class="ml-1 underline">changer</a>
+            </p>
+        @endif
         <nav class="flex gap-1 overflow-x-auto px-3 pb-3 text-sm lg:flex-1 lg:flex-col lg:overflow-visible lg:pt-2" aria-label="Administration">
             @foreach ($links as [$route, $params, $label, , $icon])
                 @php $active = request()->routeIs($route.'*'); @endphp

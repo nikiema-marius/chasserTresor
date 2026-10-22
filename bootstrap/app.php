@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Middleware\EnsureAdminSecurity;
-use App\Http\Middleware\EnsureCurrentCampaignParticipant;
 use App\Http\Middleware\EnsureDeviceId;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -33,7 +32,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin.secure' => EnsureAdminSecurity::class,
-            'participant.current' => EnsureCurrentCampaignParticipant::class,
         ]);
 
         // Visiteur non connecté → page de connexion adaptée à l'espace visité

@@ -21,12 +21,19 @@
     <div class="flex items-center gap-3">
         <x-avatar :participant="$participant" size="size-12 text-lg" />
         <div>
-            <p class="text-lg font-black">Bonjour {{ $participant->first_name }} 👋</p>
+            <p class="text-lg font-black">Bonjour {{ $participant->pseudo }} 👋</p>
             <p class="text-sm text-gray-600">Bienvenue sur la chasse au trésor du SIAO !</p>
         </div>
     </div>
 
-    <section class="card mt-5">
+    <p class="mt-4 flex items-center justify-between gap-2 rounded-xl bg-white px-4 py-2 text-sm shadow-sm ring-1 ring-black/5">
+        <span class="flex items-center gap-2"><span class="size-3 shrink-0 rounded-full" style="background: {{ $campaign->color }}" aria-hidden="true"></span>Jeu : <strong>{{ $campaign->name }}</strong></span>
+        @if ($otherGames->isNotEmpty())
+            <a href="#mes-jeux" class="font-semibold text-om-dark underline">Changer de jeu</a>
+        @endif
+    </p>
+
+    <section class="card mt-3">
         <h2 class="font-bold">Ma collection de lettres</h2>
         <div class="mt-2 flex items-baseline justify-between">
             <p class="text-2xl font-black tabular-nums">{{ $participant->letters_count }} / {{ $campaign->word_length }}</p>
@@ -101,7 +108,15 @@
     </a>
     @endif
 
+    @if ($otherGames->isNotEmpty())
+        <section id="mes-jeux" class="mt-8">
+            <h2 class="text-lg font-black">{{ $otherGames->count() > 1 ? 'Mes autres jeux' : 'Un autre jeu en ligne' }}</h2>
+            <p class="text-sm text-gray-600">Même compte, une collection de lettres par jeu.</p>
+            <x-games-list :games="$otherGames" class="mt-3" />
+        </section>
+    @endif
+
     <p class="mt-6 text-center text-sm">
-        <a href="{{ route('regulation') }}" class="font-semibold underline">★ Voir les règles du jeu</a>
+        <a href="{{ route('regulation', $campaign) }}" class="font-semibold underline">★ Voir les règles du jeu</a>
     </p>
 </div>

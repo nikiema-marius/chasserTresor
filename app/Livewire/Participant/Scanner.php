@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Participant;
 
+use App\Enums\ScanResult;
 use App\Enums\ScanSource;
+use App\Models\QrCode;
+use App\Services\QrTokenService;
 use App\Models\Participant;
 use App\Services\ScanOutcome;
 use App\Services\ScanService;
@@ -27,9 +30,18 @@ class Scanner extends Component
     public string $manualCode = '';
 
     /** Appelé par le JavaScript avec le contenu brut du QR lu. */
-    public function scan(string $raw, ScanService $service): void
+    public function scan(string $raw, ScanService $service, QrTokenService $tokens): void
     {
-        $this->present($service->scan($this->participant(), $raw, ScanSource::InApp));
+        $outcome = $service->scan($this->participant(), $raw, ScanSource::InApp);
+
+        // QR d'un autre jeu en ligne : le lien de scan bascule sur ce jeu (ou propose de le rejoindre)
+        if ($outcome->result === ScanResult::OtherCampaign && ($token = $tokens->extractToken($raw))) {
+            $this->redirectRoute('scan.link', $token);
+
+            return;
+        }
+
+        $this->present($outcome);
     }
 
     /** Saisie manuelle du code imprimé sous le QR (caméra refusée). */
@@ -40,7 +52,15 @@ class Scanner extends Component
             attributes: ['manualCode' => 'code'],
         );
 
-        $this->present($service->scan($this->participant(), $this->manualCode, ScanSource::ManualCode));
+        $outcome = $service->scan($this->participant(), $this->manualCode, ScanSource::ManualCode);
+
+        if ($outcome->result === ScanResult::OtherCampaign && ($qr = QrCode::findByManualCode($this->manualCode))) {
+            $this->redirectRoute('scan.link', $qr->plainToken());
+
+            return;
+        }
+
+        $this->present($outcome);
         $this->manualCode = '';
     }
 

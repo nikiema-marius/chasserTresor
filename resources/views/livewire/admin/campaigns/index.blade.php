@@ -6,17 +6,15 @@
         @endcan
     </div>
 
-    @php $public = $campaigns->firstWhere('is_current', true); @endphp
-    @if (! $public)
-        <p class="mt-4 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
-            Aucun jeu n'est proposé aux participants : activez une campagne.
-        </p>
-    @elseif ($public->status !== \App\Enums\CampaignStatus::Active)
-        <p class="mt-4 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
-            ⚠ Le jeu proposé aux participants est « <strong>{{ $public->name }}</strong> », mais il est <strong>{{ mb_strtolower($public->status->label()) }}</strong> :
-            les participants voient « Jeu terminé ». Activez la campagne à proposer.
-        </p>
-    @endif
+    @php $onlineCount = $campaigns->filter->isOnline()->count(); @endphp
+    <p @class(['mt-4 rounded-lg border px-4 py-3 text-sm', 'border-green-300 bg-green-50 text-green-900' => $onlineCount, 'border-yellow-300 bg-yellow-50 text-yellow-900' => ! $onlineCount])>
+        @if ($onlineCount)
+            <strong>{{ $onlineCount }} jeu{{ $onlineCount > 1 ? 'x' : '' }} en ligne</strong> : les participants les voient tous sur l'accueil
+            et chaque QR code les amène automatiquement sur le bon jeu.
+        @else
+            Aucun jeu en ligne : activez une campagne pour qu'elle apparaisse aux participants.
+        @endif
+    </p>
 
     <div class="card mt-4 overflow-x-auto p-0">
         <table class="table">
@@ -28,8 +26,8 @@
                     @php $problems = $campaign->status !== \App\Enums\CampaignStatus::Active ? $campaign->activationProblems() : []; @endphp
                     <tr wire:key="campaign-{{ $campaign->id }}">
                         <td>
-                            <p class="font-semibold">{{ $campaign->name }}</p>
-                            @if ($campaign->is_current) <span class="badge bg-om text-ink">Publique</span> @endif
+                            <p class="flex items-center gap-2 font-semibold"><span class="size-3 shrink-0 rounded-full" style="background: {{ $campaign->color }}" aria-hidden="true"></span>{{ $campaign->name }}</p>
+                            @if ($campaign->isOnline()) <span class="badge bg-om text-ink">En ligne</span> @endif
                         </td>
                         <td class="text-xs whitespace-nowrap">
                             {{ $campaign->starts_at->setTimezone(config('game.display_timezone'))->format('d/m/Y H:i') }}<br>
@@ -59,9 +57,7 @@
                                 @can('manage')
                                     <a href="{{ route('admin.qr-codes', $campaign) }}" class="btn btn-ghost btn-sm">QR codes</a>
                                     <a href="{{ route('admin.campaigns.edit', $campaign) }}" class="btn btn-ghost btn-sm">Modifier</a>
-                                    @unless ($campaign->is_current)
-                                        <button wire:click="makeCurrent({{ $campaign->id }})" wire:confirm="Rendre cette campagne publique ?" class="btn btn-ghost btn-sm">Rendre publique</button>
-                                    @endunless
+                                    <a href="{{ route('admin.prizes', $campaign) }}" class="btn btn-ghost btn-sm">Gains</a>
                                     @foreach (\App\Enums\CampaignStatus::cases() as $status)
                                         @if ($status !== $campaign->status && $status !== \App\Enums\CampaignStatus::Draft)
                                             <button wire:click="setStatus({{ $campaign->id }}, '{{ $status->value }}')" wire:confirm="Passer la campagne en « {{ $status->label() }} » ?" class="btn btn-sm {{ $status === \App\Enums\CampaignStatus::Active ? 'btn-primary' : 'btn-ghost' }}">{{ $status->label() }}</button>

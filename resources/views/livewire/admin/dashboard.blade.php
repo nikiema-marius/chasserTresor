@@ -4,7 +4,7 @@
         @if ($campaigns->isNotEmpty())
             <select wire:model.live="campaignId" class="field field-sm w-auto" aria-label="Campagne">
                 @foreach ($campaigns as $c)
-                    <option value="{{ $c->id }}" @selected($campaign?->id === $c->id)>{{ $c->name }}{{ $c->is_current ? ' (publique)' : '' }}</option>
+                    <option value="{{ $c->id }}" @selected($campaign?->id === $c->id)>{{ $c->name }}{{ $c->isOnline() ? ' (en ligne)' : '' }}</option>
                 @endforeach
             </select>
         @endif

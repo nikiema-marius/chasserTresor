@@ -43,7 +43,6 @@ class DemoCampaignSeeder extends Seeder
             'regulation_version' => '1.0',
         ], 'ARTISAN');
 
-        $campaign->makeCurrent();
 
         $perLetter = (int) config('game.qr.default_per_letter', 2);
         $rows = [];

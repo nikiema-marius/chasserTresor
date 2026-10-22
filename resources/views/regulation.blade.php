@@ -19,6 +19,13 @@
                     vos données depuis la page « Mes données personnelles ».
                 </p>
             </div>
+        @elseif ($online->isNotEmpty())
+            <p class="mt-3 text-sm text-gray-600">Choisis le jeu dont tu veux lire le règlement :</p>
+            <ul class="mt-3 grid gap-2">
+                @foreach ($online as $game)
+                    <li><a href="{{ route('regulation', $game) }}" class="btn btn-ghost w-full">{{ $game->name }}</a></li>
+                @endforeach
+            </ul>
         @else
             <p class="mt-4">Aucun jeu en cours.</p>
         @endif

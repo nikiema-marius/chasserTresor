@@ -25,8 +25,7 @@ class Participant extends Authenticatable
 
     protected $fillable = [
         'campaign_id',
-        'first_name',
-        'last_name',
+        'pseudo',
         'phone_e164',
         'consent_rules_at',
         'consent_rules_version',
@@ -114,11 +113,6 @@ class Participant extends Authenticatable
     // État de la partie
     // ------------------------------------------------------------------
 
-    protected function fullName(): Attribute
-    {
-        return Attribute::get(fn () => trim($this->first_name.' '.$this->last_name));
-    }
-
     /** Numéro masqué pour l'affichage : +226 70 •• •• 56 */
     protected function maskedPhone(): Attribute
     {
@@ -154,6 +148,23 @@ class Participant extends Authenticatable
     public function remainingAttempts(): int
     {
         return max(0, $this->allowedAttempts() - $this->word_attempts);
+    }
+
+    // ------------------------------------------------------------------
+    // Compte multi-jeux : une participation par campagne, reliées par le numéro
+    // ------------------------------------------------------------------
+
+    /** Toutes les participations du même compte (même numéro), tous jeux confondus. */
+    public function accountParticipations(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::query()->where('phone_e164', $this->phone_e164)->whereNull('anonymized_at');
+    }
+
+    public function participationIn(int $campaignId): ?self
+    {
+        return (int) $this->campaign_id === $campaignId
+            ? $this
+            : $this->accountParticipations()->where('campaign_id', $campaignId)->first();
     }
 
     public function hasClaimedPrize(): bool

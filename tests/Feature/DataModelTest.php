@@ -100,13 +100,22 @@ class DataModelTest extends TestCase
         QrExclusiveClaim::create(['qr_code_id' => $qr->id, 'participant_id' => $b->id, 'claimed_at' => now()]);
     }
 
-    public function test_une_seule_campagne_courante(): void
+    public function test_plusieurs_campagnes_en_ligne_en_meme_temps(): void
     {
-        $first = Campaign::factory()->current()->create();
-        $second = Campaign::factory()->current()->create();
+        $orange = Campaign::factory()->withWord('ORANGE')->create();
+        $siao = Campaign::factory()->withWord('SIAO')->create();
+        $soon = Campaign::factory()->notStarted()->create();            // active, commence plus tard : en ligne
+        $closed = Campaign::factory()->closed()->create();
+        $draft = Campaign::factory()->create(['status' => 'draft']);
+        $ended = Campaign::factory()->create(['ends_at' => now()->subMinute()]);
 
-        $this->assertNull($first->fresh()->is_current);
-        $this->assertTrue(Campaign::current()->is($second));
+        $online = Campaign::online()->pluck('id')->all();
+
+        $this->assertEqualsCanonicalizing([$orange->id, $siao->id, $soon->id], $online);
+        $this->assertTrue($orange->isOnline());
+        $this->assertFalse($closed->isOnline());
+        $this->assertFalse($draft->isOnline());
+        $this->assertFalse($ended->isOnline());
     }
 
     public function test_disponibilite_de_la_campagne(): void

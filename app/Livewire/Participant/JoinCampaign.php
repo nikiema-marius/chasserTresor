@@ -3,7 +3,6 @@
 namespace App\Livewire\Participant;
 
 use App\Enums\ParticipantStatus;
-use App\Enums\ScanResult;
 use App\Livewire\Concerns\AuthenticatesParticipant;
 use App\Models\Campaign;
 use App\Models\Participant;
@@ -11,13 +10,14 @@ use App\Services\AuditLogger;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 /**
- * Un participant déjà inscrit à un jeu précédent rejoint le jeu en cours en un clic :
- * son compte (nom, téléphone, PIN) est repris, il accepte seulement le règlement du nouveau jeu.
- * La progression (lettres, essais) repart à zéro pour chaque campagne.
+ * Le participant rejoint un autre jeu en ligne en un clic : son compte (nom,
+ * téléphone, PIN) est repris, il accepte seulement le règlement de ce jeu.
+ * La progression (lettres, essais) est propre à chaque campagne.
  */
 #[Layout('components.layouts.app')]
 #[Title('Rejoindre le jeu')]
@@ -25,34 +25,42 @@ class JoinCampaign extends Component
 {
     use AuthenticatesParticipant;
 
+    #[Locked]
+    public int $campaignId;
+
     public bool $consent_rules = false;
 
-    public bool $age_confirmed = false;
-
-    public function mount(): void
+    public function mount(Campaign $campaign): void
     {
-        $current = Campaign::current();
+        $this->campaignId = $campaign->id;
 
-        // Déjà inscrit au jeu en cours (ou aucun jeu) : rien à rejoindre
-        if (! $current || (int) $this->participant()->campaign_id === (int) $current->id) {
-            $this->redirectRoute('dashboard');
+        if (! $campaign->isOnline()) {
+            session()->flash('error', "Le jeu « {$campaign->name} » n'est pas en ligne.");
+            $this->redirectRoute('home');
+
+            return;
+        }
+
+        // Déjà inscrit à ce jeu : on bascule simplement dessus
+        if ($participation = $this->participant()->participationIn($campaign->id)) {
+            $this->loginAndRedirect($participation);
         }
     }
 
     public function join(AuditLogger $audit): void
     {
-        $campaign = Campaign::current();
+        $campaign = Campaign::query()->findOrFail($this->campaignId);
         $account = $this->participant();
 
-        if (! $campaign || $campaign->availabilityAt(now()) === ScanResult::CampaignClosed) {
-            $this->addError('consent_rules', 'Ce jeu est terminé.');
+        if (! $campaign->isOnline()) {
+            $this->addError('consent_rules', 'Ce jeu n\'est plus en ligne.');
 
             return;
         }
 
         $this->validate(
-            ['consent_rules' => ['accepted'], 'age_confirmed' => ['accepted']],
-            attributes: ['consent_rules' => 'acceptation du règlement', 'age_confirmed' => "confirmation de l'âge"],
+            ['consent_rules' => ['accepted']],
+            attributes: ['consent_rules' => 'acceptation du règlement'],
         );
 
         $participation = $this->findOrCreateParticipation($campaign, $account);
@@ -64,31 +72,24 @@ class JoinCampaign extends Component
 
     public function render()
     {
-        $campaign = Campaign::current();
+        $campaign = Campaign::query()->findOrFail($this->campaignId);
 
         return view('livewire.participant.join-campaign', [
             'participant' => $this->participant(),
             'campaign' => $campaign,
-            'availability' => $campaign?->availabilityAt(now()),
         ]);
     }
 
     /** Copie l'identité du compte dans une nouvelle participation (protégée par l'index unique). */
     private function findOrCreateParticipation(Campaign $campaign, Participant $account): Participant
     {
-        $existing = fn () => Participant::query()
-            ->where('campaign_id', $campaign->id)
-            ->where('phone_e164', $account->phone_e164)
-            ->first();
-
-        if ($found = $existing()) {
+        if ($found = $account->participationIn($campaign->id)) {
             return $found;
         }
 
         $participation = new Participant([
             'campaign_id' => $campaign->id,
-            'first_name' => $account->first_name,
-            'last_name' => $account->last_name,
+            'pseudo' => $account->pseudo,
             'phone_e164' => $account->phone_e164,
             'consent_rules_at' => now(),
             'consent_rules_version' => $campaign->regulation_version,
@@ -109,7 +110,7 @@ class JoinCampaign extends Component
             $participation->save();
         } catch (UniqueConstraintViolationException) {
             // Double clic simultané : la participation existe déjà
-            return $existing();
+            return $account->participationIn($campaign->id);
         }
 
         return $participation;

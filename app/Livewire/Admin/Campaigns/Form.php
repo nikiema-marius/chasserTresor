@@ -33,6 +33,9 @@ class Form extends Component
 
     public string $name = '';
 
+    // Couleur de repérage du jeu (QR imprimés, écrans participants)
+    public string $color = '#FF7900';
+
     public string $starts_at = '';
 
     public string $ends_at = '';
@@ -73,6 +76,7 @@ class Form extends Component
         $this->qrPerLetter = (int) config('game.qr.default_per_letter', 2);
 
         if (! $campaign?->exists) {
+            $this->color = Campaign::suggestColor();
             $tz = config('game.display_timezone');
             $this->starts_at = now($tz)->addDay()->setTime(9, 0)->format('Y-m-d\TH:i');
             $this->ends_at = now($tz)->addDays(10)->setTime(20, 0)->format('Y-m-d\TH:i');
@@ -84,6 +88,7 @@ class Form extends Component
         $this->campaignId = $campaign->id;
         $this->fill([
             'name' => $campaign->name,
+            'color' => $campaign->color,
             'starts_at' => $campaign->starts_at->setTimezone($tz)->format('Y-m-d\TH:i'),
             'ends_at' => $campaign->ends_at->setTimezone($tz)->format('Y-m-d\TH:i'),
             'daily_open_time' => substr((string) $campaign->daily_open_time, 0, 5),
@@ -107,6 +112,7 @@ class Form extends Component
 
         return [
             'name' => ['required', 'string', 'max:150'],
+            'color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'daily_open_time' => ['nullable', 'date_format:H:i', 'required_with:daily_close_time'],
@@ -131,7 +137,7 @@ class Form extends Component
     protected function validationAttributes(): array
     {
         return [
-            'name' => 'nom', 'starts_at' => 'début', 'ends_at' => 'fin',
+            'name' => 'nom', 'color' => 'couleur', 'starts_at' => 'début', 'ends_at' => 'fin',
             'daily_open_time' => 'ouverture', 'daily_close_time' => 'fermeture',
             'word' => 'mot mystère', 'qrPerLetter' => 'QR codes par lettre', 'max_word_attempts' => 'tentatives',
             'min_seconds_between_scans' => 'délai entre scans', 'regulation_version' => 'version du règlement',
@@ -146,6 +152,7 @@ class Form extends Component
         $tz = config('game.display_timezone');
         $attributes = [
             'name' => $this->name,
+            'color' => strtoupper($this->color),
             'starts_at' => Carbon::parse($this->starts_at, $tz)->utc(),
             'ends_at' => Carbon::parse($this->ends_at, $tz)->utc(),
             'daily_open_time' => $this->daily_open_time ?: null,

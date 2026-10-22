@@ -32,16 +32,15 @@ class RegistrationTest extends TestCase
     private function form(): \Livewire\Features\SupportTesting\Testable
     {
         return Livewire::test(Register::class)
-            ->set('first_name', 'Awa')
-            ->set('last_name', 'Ouédraogo')
+            ->set('pseudo', 'Awa226')
             ->set('phone', '70 12 34 56')
-            ->set('consent_rules', true)
-            ->set('age_confirmed', true);
+            ->set('consent_rules', true);
     }
 
     public function test_inscription_avec_otp(): void
     {
-        Campaign::factory()->current()->create(['otp_required' => true]);
+        config(['game.otp.enabled' => true]);
+        Campaign::factory()->create();
 
         $component = $this->form()->call('submit')->assertHasNoErrors()->assertSet('step', 'otp');
 
@@ -60,7 +59,8 @@ class RegistrationTest extends TestCase
 
     public function test_un_code_otp_ne_sert_qu_une_fois_et_expire(): void
     {
-        Campaign::factory()->current()->create(['otp_required' => true]);
+        config(['game.otp.enabled' => true]);
+        Campaign::factory()->create();
         $component = $this->form()->call('submit');
         $code = $this->sms->lastCodeFor('+22670123456');
 
@@ -70,7 +70,8 @@ class RegistrationTest extends TestCase
 
     public function test_otp_bloque_apres_5_erreurs(): void
     {
-        Campaign::factory()->current()->create(['otp_required' => true]);
+        config(['game.otp.enabled' => true]);
+        Campaign::factory()->create();
         $component = $this->form()->call('submit');
         $code = $this->sms->lastCodeFor('+22670123456');
         $wrong = $code === '999999' ? '888888' : '999999';
@@ -85,7 +86,8 @@ class RegistrationTest extends TestCase
 
     public function test_limite_d_envoi_de_sms(): void
     {
-        Campaign::factory()->current()->create(['otp_required' => true]);
+        config(['game.otp.enabled' => true]);
+        Campaign::factory()->create();
         $component = $this->form()->call('submit');
 
         $component->call('resendOtp')->call('resendOtp')->call('resendOtp')->assertHasErrors('code');
@@ -94,11 +96,11 @@ class RegistrationTest extends TestCase
 
     public function test_un_numero_ne_peut_s_inscrire_qu_une_fois(): void
     {
-        $campaign = Campaign::factory()->current()->create(['otp_required' => false]);
+        $campaign = Campaign::factory()->create();
         Participant::factory()->for($campaign)->create(['phone_e164' => '+22670123456']);
 
         // Même numéro saisi dans un autre format
-        $this->form()->set('phone', '+226 70-12-34-56')->set('pin', '4826')->set('pin_confirmation', '4826')
+        $this->form()->set('phone', '+226 70-12-34-56')->set('pin', '4826')
             ->call('submit')
             ->assertHasErrors('phone');
 
@@ -107,10 +109,10 @@ class RegistrationTest extends TestCase
 
     public function test_inscription_sans_otp_avec_pin_puis_reconnexion(): void
     {
-        Campaign::factory()->current()->create(['otp_required' => false]);
+        Campaign::factory()->create();
 
-        $this->form()->set('pin', '1234')->set('pin_confirmation', '1234')->call('submit')->assertHasErrors('pin');
-        $this->form()->set('pin', '4826')->set('pin_confirmation', '4826')->call('submit')->assertRedirect(route('dashboard'));
+        $this->form()->set('pin', '1234')->call('submit')->assertHasErrors('pin');
+        $this->form()->set('pin', '4826')->call('submit')->assertRedirect(route('dashboard'));
 
         $this->assertNull(Participant::query()->first()->phone_verified_at);
         $this->assertCount(0, $this->sms->sent);
@@ -123,7 +125,7 @@ class RegistrationTest extends TestCase
 
     public function test_pin_verrouille_apres_5_erreurs(): void
     {
-        $campaign = Campaign::factory()->current()->create(['otp_required' => false]);
+        $campaign = Campaign::factory()->create();
         $participant = Participant::factory()->for($campaign)->create(['phone_e164' => '+22670123456']);
         $participant->forceFill(['pin_hash' => bcrypt('4826')])->save();
 
@@ -138,21 +140,22 @@ class RegistrationTest extends TestCase
 
     public function test_reconnexion_par_otp(): void
     {
-        $campaign = Campaign::factory()->current()->create(['otp_required' => true]);
+        config(['game.otp.enabled' => true]);
+        $campaign = Campaign::factory()->create();
         Participant::factory()->for($campaign)->create(['phone_e164' => '+22670123456']);
 
         $component = Livewire::test(Login::class)->set('phone', '70 12 34 56')->call('submit')->assertSet('step', 'otp');
         $component->set('code', $this->sms->lastCodeFor('+22670123456'))->call('verifyOtp')->assertRedirect(route('dashboard'));
     }
 
-    public function test_compte_d_un_jeu_precedent_se_connecte_sans_reinscription(): void
+    public function test_un_compte_se_connecte_et_voit_les_autres_jeux_en_ligne(): void
     {
-        $old = Campaign::factory()->create();
-        $account = Participant::factory()->for($old)->create(['phone_e164' => '+22670000000']);
+        $orange = Campaign::factory()->create(['name' => 'ORANGE']);
+        $account = Participant::factory()->for($orange)->create(['phone_e164' => '+22670000000']);
         $account->forceFill(['pin_hash' => bcrypt('4826')])->save();
-        Campaign::factory()->current()->create(['name' => 'SIAO 2026', 'otp_required' => false]);
+        $siao = Campaign::factory()->create(['name' => 'SIAO']);
 
-        // Connexion avec le PIN habituel, puis le tableau de bord mène à « Rejoindre le jeu »
+        // Connexion avec le PIN habituel, sans réinscription
         Livewire::test(Login::class)
             ->set('phone', '70000000')->set('pin', '4826')
             ->call('submit')
@@ -160,16 +163,44 @@ class RegistrationTest extends TestCase
             ->assertRedirect(route('dashboard'));
 
         $this->assertAuthenticatedAs($account, 'participant');
-        $this->get(route('dashboard'))->assertRedirect(route('join'));
+
+        // Le tableau de bord propose de rejoindre l'autre jeu en ligne
+        $this->get(route('dashboard'))->assertOk()->assertSee('Rejoindre ce jeu')->assertSee(route('join', $siao), false);
+    }
+
+    public function test_connexion_sur_le_jeu_du_qr_scanne(): void
+    {
+        [$orange] = [Campaign::factory()->create(['name' => 'ORANGE'])];
+        $siao = Campaign::factory()->create(['name' => 'SIAO']);
+        $qr = \App\Models\QrCode::factory()->forLetter($siao->letters->first())->create();
+        $inOrange = Participant::factory()->for($orange)->create(['phone_e164' => '+22670000000']);
+        $inSiao = Participant::factory()->for($siao)->create(['phone_e164' => '+22670000000']);
+        foreach ([$inOrange, $inSiao] as $p) {
+            $p->forceFill(['pin_hash' => bcrypt('4826')])->save();
+        }
+
+        // QR de SIAO scanné avant connexion : on est connecté sur la participation SIAO
+        $this->get('/s/'.$qr->plainToken())->assertRedirect(route('register', ['jeu' => $siao->slug]));
+        Livewire::test(Login::class)->set('phone', '70000000')->set('pin', '4826')->call('submit')
+            ->assertRedirect(route('scan.link', $qr->plainToken()));
+
+        $this->assertAuthenticatedAs($inSiao, 'participant');
     }
 
     public function test_inscription_refusee_si_le_numero_a_deja_un_compte(): void
     {
-        $old = Campaign::factory()->create();
+        $old = Campaign::factory()->create(['name' => 'ORANGE']);
         Participant::factory()->for($old)->create(['phone_e164' => '+22670123456']);
-        Campaign::factory()->current()->create(['otp_required' => false]);
+        $siao = Campaign::factory()->create(['name' => 'SIAO']);
 
-        $this->form()->set('pin', '4826')->set('pin_confirmation', '4826')
+        // Deux jeux en ligne : il faut d'abord choisir le jeu
+        $component = $this->form()->set('pin', '4826')
+            ->assertSee('Choisis ton jeu')
+            ->call('submit')
+            ->assertHasErrors('chosenCampaignId');
+
+        // Puis le numéro déjà connu est refusé : il faut se connecter
+        $component->set('chosenCampaignId', $siao->id)
             ->call('submit')
             ->assertHasErrors('phone')
             ->assertSee('déjà un compte');
@@ -179,7 +210,7 @@ class RegistrationTest extends TestCase
 
     public function test_numero_inconnu(): void
     {
-        Campaign::factory()->current()->create(['otp_required' => false]);
+        Campaign::factory()->create();
 
         Livewire::test(Login::class)
             ->set('phone', '70000000')->set('pin', '4826')
@@ -190,23 +221,47 @@ class RegistrationTest extends TestCase
 
     public function test_validations_du_formulaire(): void
     {
-        Campaign::factory()->current()->create(['otp_required' => true]);
+        Campaign::factory()->create();
 
+        // Champs vides ou invalides : pseudo, téléphone, code secret, règlement
         Livewire::test(Register::class)
             ->set('phone', '12')
-            ->set('first_name', '<script>')
+            ->set('pseudo', '<script>')
             ->call('submit')
-            ->assertHasErrors(['phone', 'first_name', 'last_name', 'consent_rules', 'age_confirmed']);
+            ->assertHasErrors(['phone', 'pseudo', 'pin', 'consent_rules']);
+
+        // Un pseudo trop court est refusé
+        Livewire::test(Register::class)->set('pseudo', 'A')->call('submit')->assertHasErrors('pseudo');
+    }
+
+    public function test_formulaire_pseudo_telephone_code_secret(): void
+    {
+        Campaign::factory()->create();
+
+        Livewire::test(Register::class)
+            ->assertSee('Pseudo')
+            ->assertSee('Numéro de téléphone')
+            ->assertSee('Code secret (4 chiffres)')
+            ->assertDontSee('Prénom')
+            ->assertDontSee('Confirmation')
+            ->set('pseudo', 'Zeus_226')->set('phone', '70 12 34 56')->set('pin', '4826')->set('consent_rules', true)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('dashboard'));
+
+        $participant = Participant::query()->firstOrFail();
+        $this->assertSame('Zeus_226', $participant->pseudo);
+        $this->assertTrue($participant->age_confirmed, 'L\'âge est confirmé par la case du règlement');
     }
 
     public function test_qr_scanne_avant_inscription_est_valide_apres(): void
     {
-        $campaign = Campaign::factory()->current()->create(['otp_required' => false]);
+        $campaign = Campaign::factory()->create();
         $qr = \App\Models\QrCode::factory()->forLetter($campaign->letters->first())->create();
 
-        $this->get('/s/'.$qr->plainToken())->assertRedirect(route('register'));
+        $this->get('/s/'.$qr->plainToken())->assertRedirect(route('register', ['jeu' => $campaign->slug]));
 
-        $this->form()->set('pin', '4826')->set('pin_confirmation', '4826')->call('submit')
+        $this->form()->set('pin', '4826')->call('submit')
             ->assertRedirect(route('scan.link', $qr->plainToken()));
     }
 }
