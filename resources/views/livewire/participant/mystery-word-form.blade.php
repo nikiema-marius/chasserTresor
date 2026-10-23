@@ -3,28 +3,21 @@
         {{-- Écran gagnant : à présenter au chapiteau Orange Money pour récupérer le gain --}}
         @php $tz = config('game.display_timezone'); @endphp
         <section class="relative overflow-hidden py-2 text-center">
-            @unless ($participant->hasClaimedPrize())
-                @foreach ([['8%', '6%', '#FF7900', '-20deg'], ['20%', '0%', '#16a34a', '35deg'], ['78%', '2%', '#FF7900', '15deg'], ['90%', '14%', '#111', '-40deg'], ['4%', '24%', '#16a34a', '60deg'], ['94%', '28%', '#FF7900', '-10deg']] as $i => [$left, $top, $color, $rotate])
-                    <span class="confetti" style="left: {{ $left }}; top: {{ $top }}; background: {{ $color }}; rotate: {{ $rotate }}; animation-delay: {{ $i * 60 }}ms" aria-hidden="true"></span>
-                @endforeach
-            @endunless
-
-            <div class="animate-letter-pop mx-auto grid size-24 place-items-center rounded-full bg-green-600 text-5xl" aria-hidden="true">🏆</div>
-            <h1 class="mt-4 text-4xl font-black text-om">BRAVOOO !</h1>
-            <p class="mt-1 text-lg font-bold">Tu as trouvé toutes les lettres !</p>
+            <h1 class="sr-only">BRAVOOO ! Tu as trouvé toutes les lettres !</h1>
+            <x-celebration title="BRAVOOO !" subtitle="Tu as trouvé toutes les lettres !" />
 
             <p class="mt-5 text-sm text-gray-600">Le mot mystère était :</p>
-            <x-letter-tiles :groups="$tileGroups" class="mt-2" />
+            <x-letter-tiles :groups="$tileGroups" class="relative z-10 mt-2" />
 
             @if ($participant->hasClaimedPrize())
-                <div class="card mt-6 border-4 border-gray-400 bg-gray-50">
+                <div class="card relative z-10 mt-6 border-4 border-gray-400 bg-gray-50">
                     <p class="text-xl font-black text-gray-700">✓ GAIN DÉJÀ REMIS</p>
                     <p class="mt-1 text-sm text-gray-600">
                         Le {{ $participant->prize_claimed_at->setTimezone($tz)->translatedFormat('j F à H\hi') }}. Merci d'avoir participé !
                     </p>
                 </div>
             @else
-                <div class="card mt-6 border-2 border-om bg-om-soft text-left">
+                <div class="card relative z-10 mt-6 border-2 border-om bg-om-soft text-left">
                     <p class="text-lg font-black">🎁 Ton gain t'attend !</p>
                     <p class="mt-1 text-sm">
                         Rends-toi au <strong>chapiteau Orange Money</strong> et <strong>montre cet écran</strong> à l'équipe
@@ -33,7 +26,7 @@
                 </div>
 
                 {{-- Bloc de vérification pour l'équipe : l'horloge défile en direct (une capture d'écran se repère) --}}
-                <div class="card mt-4 border-4 border-ink" x-data="{ now: '' }"
+                <div class="card relative z-10 mt-4 border-4 border-ink" x-data="{ now: '' }"
                      x-init="const tick = () => now = new Date().toLocaleTimeString('fr-FR'); tick(); setInterval(tick, 1000)">
                     <p class="text-xs font-bold tracking-wide text-gray-500 uppercase">Justificatif gagnant</p>
                     <p class="mt-2 text-xl font-black">{{ $participant->pseudo }}</p>
@@ -52,7 +45,7 @@
                 </div>
             @endif
 
-            <a href="{{ route('dashboard') }}" class="btn btn-ghost mt-6 w-full">Retour à l'accueil</a>
+            <a href="{{ route('dashboard') }}" class="btn btn-ghost relative z-10 mt-6 w-full">Retour à l'accueil</a>
         </section>
     @else
         {{-- Maquette 7 : saisie --}}

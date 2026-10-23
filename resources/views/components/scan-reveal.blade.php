@@ -16,12 +16,26 @@
 @endphp
 
 <div {{ $attributes->class('relative flex min-h-full flex-col items-center px-6 pt-12 pb-8 text-center') }} role="status">
-    @if ($outcome['success'])
+    @if ($outcome['success'] && ! empty($outcome['solved']))
+        {{-- Dernière lettre : le jeu est gagné, le bonhomme danse --}}
+        <x-celebration title="BRAVOOO !" subtitle="Tu as toutes les lettres !" />
+
+        @if ($outcome['letter'])
+            <p class="relative mt-4 text-sm text-gray-600">Dernière lettre trouvée :</p>
+            <div class="animate-letter-pop relative mt-1 grid size-16 place-items-center rounded-2xl bg-om text-4xl font-black text-white shadow-[0_5px_0_0_var(--color-om-dark)]">
+                {{ $outcome['letter'] }}
+            </div>
+        @endif
+
+        <p class="relative mt-6 text-gray-700">
+            Tu as gagné ! Va récupérer ton gain au <strong>chapiteau Orange Money</strong> en montrant ton justificatif.
+        </p>
+    @elseif ($outcome['success'])
         @foreach ($confetti as $i => [$left, $top, $color, $rotate])
-            <span class="confetti" style="left: {{ $left }}; top: {{ $top }}; background: {{ $color }}; rotate: {{ $rotate }}; animation-delay: {{ $i * 60 }}ms" aria-hidden="true"></span>
+            <span class="confetti" style="left: {{ $left }}; top: {{ $top }}; background-color: {{ $color }}; background-position: -{{ ($i * 47) % 290 }}px -{{ ($i * 11) % 40 }}px; rotate: {{ $rotate }}; animation-delay: {{ $i * 60 }}ms" aria-hidden="true"></span>
         @endforeach
 
-        <p class="text-4xl font-black text-om">{{ ! empty($outcome['solved']) ? 'BRAVOOO !' : 'Bravo !' }}</p>
+        <p class="text-4xl font-black text-om">Bravo !</p>
         <p class="mt-1 text-xl font-bold">{{ $outcome['completed'] ? 'Tu as toutes les lettres !' : 'Tu as trouvé une lettre !' }}</p>
 
         @if ($outcome['letter'])
@@ -31,9 +45,7 @@
         @endif
 
         <p class="mt-8 text-gray-700">
-            @if (! empty($outcome['solved']))
-                Tu as gagné ! Va récupérer ton gain au <strong>chapiteau Orange Money</strong> en montrant ton justificatif.
-            @elseif ($outcome['completed'])
+            @if ($outcome['completed'])
                 Tu peux maintenant découvrir le mot mystère !
             @else
                 Une nouvelle lettre vient d'être ajoutée à ta collection.
@@ -45,7 +57,7 @@
         <p class="mt-3 text-gray-700">{{ $outcome['message'] }}</p>
     @endif
 
-    <div class="card mt-8 w-full text-left">
+    <div class="card relative z-10 mt-8 w-full text-left">
         <div class="flex items-baseline justify-between">
             <p class="font-bold">Ta progression</p>
             <p class="text-sm font-bold tabular-nums">{{ $percent }}%</p>
@@ -56,7 +68,7 @@
         </div>
     </div>
 
-    <div class="mt-8 grid w-full gap-3">
+    <div class="relative z-10 mt-8 grid w-full gap-3">
         {{ $actions }}
     </div>
 </div>

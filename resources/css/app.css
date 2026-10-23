@@ -144,18 +144,87 @@
 /* Confettis décoratifs des écrans de réussite */
 .confetti {
     position: absolute;
-    width: 4px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 2px;
-    animation: confetti-fall 1.2s ease-out both;
+    /* Morceau du tissu Lui Lipendé (couleur inline en secours) */
+    background-image: url('/images/lui-lipende.png');
+    background-image: image-set(url('/images/lui-lipende.webp') type('image/webp'), url('/images/lui-lipende.png') type('image/png'));
+    background-size: auto 48px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .25);
+    animation: confetti-fall 2.6s ease-out both;
 }
+/* Apparition, petite chute, puis effacement : ne masque jamais le texte en dessous */
 @keyframes confetti-fall {
-    from { transform: translateY(-14px) rotate(0); opacity: 0; }
-    to { opacity: 1; }
+    0% { transform: translateY(-14px) rotate(0); opacity: 0; }
+    20% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { transform: translateY(60px) rotate(180deg); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .scan-line, .confetti { animation: none; }
+}
+
+/* ------------------------------------------------------------------
+   Victoire : bonhomme qui danse (composant <x-dancer>)
+   Chaque partie pivote autour de son articulation (transform-box: fill-box).
+   ------------------------------------------------------------------ */
+.dancer * { transform-box: fill-box; }
+.dancer-bounce { animation: dancer-bounce .6s ease-in-out infinite; }
+.dancer-shadow { transform-origin: center; animation: dancer-shadow .6s ease-in-out infinite; }
+.dancer-body { transform-origin: 50% 100%; animation: dancer-sway 1.2s ease-in-out infinite; }
+.dancer-arm-l { transform-origin: 50% 7%; animation: dancer-arm-l .6s ease-in-out infinite; }
+.dancer-arm-r { transform-origin: 50% 7%; animation: dancer-arm-r .6s ease-in-out infinite; }
+.dancer-leg-l { transform-origin: 50% 0; animation: dancer-leg-l .6s ease-in-out infinite; }
+.dancer-leg-r { transform-origin: 50% 0; animation: dancer-leg-r .6s ease-in-out infinite; }
+.dancer-head { transform-origin: 50% 100%; animation: dancer-head 1.2s ease-in-out infinite; }
+.dancer-eyes { transform-origin: center; animation: dancer-blink 3.2s ease-in-out infinite; }
+.dancer-spark { transform-origin: center; animation: dancer-spark 1.2s ease-in-out infinite; }
+
+@keyframes dancer-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes dancer-shadow { 0%, 100% { transform: scaleX(1); opacity: .18; } 50% { transform: scaleX(.72); opacity: .08; } }
+@keyframes dancer-sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+@keyframes dancer-arm-l { 0%, 100% { transform: rotate(155deg); } 50% { transform: rotate(35deg); } }
+@keyframes dancer-arm-r { 0%, 100% { transform: rotate(-35deg); } 50% { transform: rotate(-155deg); } }
+@keyframes dancer-leg-l { 0%, 100% { transform: rotate(14deg); } 50% { transform: rotate(-3deg); } }
+@keyframes dancer-leg-r { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(-14deg); } }
+@keyframes dancer-head { 0%, 100% { transform: rotate(9deg); } 50% { transform: rotate(-9deg); } }
+@keyframes dancer-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.1); } }
+@keyframes dancer-spark { 0%, 100% { transform: scale(.4) rotate(0); opacity: .3; } 50% { transform: scale(1.25) rotate(45deg); opacity: 1; } }
+
+/* Titre aux lettres qui sautent l'une après l'autre */
+.wave-letter { display: inline-block; animation: wave-letter 1.4s ease-in-out infinite; }
+@keyframes wave-letter { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-12px) scale(1.1); } }
+
+/* Pluie de confettis (deux passages puis disparition) */
+.confetti-rain { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.confetti-rain span {
+    position: absolute;
+    top: -6%;
+    border-radius: 2px;
+    /* Morceau du tissu Lui Lipendé (la couleur inline sert de secours si l'image ne charge pas) */
+    background-image: url('/images/lui-lipende.png');
+    background-image: image-set(url('/images/lui-lipende.webp') type('image/webp'), url('/images/lui-lipende.png') type('image/png'));
+    background-size: auto 48px;
+    background-repeat: repeat;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .25);
+    opacity: 0;
+    animation-name: confetti-rain;
+    animation-timing-function: linear;
+    animation-iteration-count: 2;
+    animation-fill-mode: forwards;
+}
+/* Les confettis s'effacent en fin de chute : ils ne restent jamais posés sur le contenu */
+@keyframes confetti-rain {
+    0% { transform: translateY(0) rotate(0); opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dancer *, .wave-letter { animation: none !important; }
+    .confetti-rain { display: none; }
 }
 
 /* Fond discret de losanges type bogolan */

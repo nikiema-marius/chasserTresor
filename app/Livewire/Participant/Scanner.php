@@ -80,7 +80,7 @@ class Scanner extends Component
     private function present(ScanOutcome $outcome): void
     {
         $this->outcome = $outcome->toFlash();
-        $this->dispatch('scan-result', success: $outcome->isSuccess());
+        $this->dispatch('scan-result', success: $outcome->isSuccess(), solved: $outcome->solved);
     }
 
     private function participant(): Participant

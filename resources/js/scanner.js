@@ -81,7 +81,8 @@ export default function qrScanner() {
         // Appelé via l'événement Livewire « scan-result »
         onResult(detail) {
             if (navigator.vibrate) {
-                navigator.vibrate(detail?.success ? [60, 40, 60] : 200);
+                // Victoire : rythme de fête ; lettre : double impulsion ; refus : une vibration
+                navigator.vibrate(detail?.solved ? [90, 60, 90, 60, 90, 60, 300] : (detail?.success ? [60, 40, 60] : 200));
             }
         },
 
